@@ -1,0 +1,262 @@
+import pygame
+from pygame.locals import *
+from OpenGL.GL import *
+from OpenGL.GLU import *
+import random
+
+
+display_width = 800
+display_height = 600
+game_display = pygame.display.set_mode((display_width, display_height), DOUBLEBUF | OPENGL)
+pygame.display.set_caption('DX Ball')
+
+glMatrixMode(GL_PROJECTION)
+glLoadIdentity()
+glOrtho(0, display_width, display_height, 0, -1, 1)
+glMatrixMode(GL_MODELVIEW)
+
+
+black = (0, 0, 0)
+white = (255, 255, 255)
+
+
+dif = int(input("Enter difficulty level: "))
+bar_width = [200,100,75][dif]
+bar_height = 10
+bar_x = (display_width - bar_width) // 2
+bar_y = display_height - 50
+bar_speed = [12,7,10][dif]
+ball_radius = [25,15,10][dif]
+ball_x = display_width // 2
+ball_y = display_height // 2
+ball_speed_x = [5,7,10][dif]
+ball_speed_y = [-5,-7,-10][dif]
+score = 0 
+
+
+clock = pygame.time.Clock()
+
+def drawMPL(x, y):
+    glPointSize(10)
+    glBegin(GL_POINTS)
+    glVertex2f(x, y)
+    glEnd()
+
+
+def find_zone(dx, dy):
+    if dx >= 0 and dy >= 0:
+        if abs(dx) >= abs(dy):
+            return 0
+        else:
+            return 1
+    if dx <= 0 and dy >= 0:
+        if abs(dx) >= abs(dy):
+            return 3
+        else:
+            return 2
+    if dx <= 0 and dy <= 0:
+        if abs(dx) >= abs(dy):
+            return 4
+        else:
+            return 5
+    if dx >= 0 and dy <= 0:
+        if abs(dx) >= abs(dy):
+            return 7
+        else:
+            return 6
+
+def convert_to_zone0(x1, y1, x2, y2, zone):
+    if zone == 0:
+        return x1, y1, x2, y2
+    elif zone == 1:
+        return y1, x1, y2, x2
+    elif zone == 2:
+        return y1, -x1, y2, -x2
+    elif zone == 3:
+        return -x1, y1, -x2, y2
+    elif zone == 4:
+        return -x1, -y1, -x2, -y2
+    elif zone == 5:
+        return -y1, -x1, -y2, -x2
+    elif zone == 6:
+        return -y1, x1, -y2, x2
+    elif zone == 7:
+        return x1, -y1, x2, -y2
+    return x1, y1, x2, y2
+
+
+def original_zone(x, y, zone):
+    if zone == 0:
+        return x, y
+    if zone == 1:
+        return y, x
+    if zone == 2:
+        return -y, x
+    if zone == 3:
+        return -x, y
+    if zone == 4:
+        return -x, -y
+    if zone == 5:
+        return -y, -x
+    if zone == 6:
+        return y, -x
+    if zone == 7:
+        return x, -y
+
+
+def draw_bar(x1, y1 ):
+    x2 = x1 + bar_width
+    y2 = y1
+    dx = x2 - x1
+    dy = 0
+    zone = find_zone(dx, dy)
+
+    x1, y1, x2, y2 = convert_to_zone0(x1, y1, x2, y2, zone)
+    X0 = []
+    Y0 = []
+    d = []
+
+    dx = x2 - x1
+    dy = y2 - y1
+    D = 2 * dy - dx
+
+    d += [D]
+    dNE = 2 * (dy - dx)
+    dE = 2 * dy
+
+    x = x1
+    y = y1
+    while x <= x2:
+        a = x
+        b = y
+
+
+        a, b = original_zone(a, b, zone)
+        drawMPL(a, b)
+        x = x + 1
+        if D > 0:
+            y = y + 1
+            D = D + dNE
+        else:
+            D = D + dE
+            d += [D]
+
+
+
+def drawPoints(x, y):
+    glPointSize(2.0)
+    glBegin(GL_POINTS)
+    glVertex2f(int(x), int(y))
+    glEnd()
+
+def draw_ball(X, Y, r):
+    d = 1 - r
+    x = 0
+    y = r
+    while x <= y:
+        x += 1
+        if d < 0:
+            d += 2 * x + 1
+        else:
+            y -= 1
+            d += 2 * (x - y) + 1
+        drawPoints(X + x, Y + y)
+        drawPoints(X - x, Y + y)
+        drawPoints(X + x, Y - y)
+        drawPoints(X - x, Y - y)
+        drawPoints(X + y, Y + x)
+        drawPoints(X - y, Y + x)
+        drawPoints(X + y, Y - x)
+        drawPoints(X - y, Y - x)
+
+
+
+
+
+
+
+def main():
+    global ball_x, ball_y, ball_speed_x, ball_speed_y, ball_radius, display_height, display_width, bar_x, bar_y, bar_width, bar_speed, bar_height, score, rect_visible, rect_x, rect_y
+
+
+    rect_width = 50
+    rect_height = 35
+    rect_visible = True
+    rect_x = random.randint(200, display_width - rect_width)
+    rect_y = random.randint(50,200 )
+
+    game_exit = False
+
+    while not game_exit:
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                game_exit = True
+
+
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+
+
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_LEFT]:
+            bar_x -= bar_speed
+            if bar_x < 0:
+                bar_x = 0
+        elif keys[pygame.K_RIGHT]:
+            bar_x += bar_speed
+            if bar_x > display_width - bar_width:
+                bar_x = display_width - bar_width
+
+
+        ball_x += ball_speed_x
+        ball_y += ball_speed_y
+
+        #wall
+        if ball_x < ball_radius or ball_x > display_width - ball_radius:
+            ball_speed_x *= -1
+        if ball_y < ball_radius:
+            ball_speed_y *= -1
+        if ball_y > display_height - ball_radius:
+            game_exit = True
+
+        #bar
+        if ball_y + ball_radius >= bar_y and ball_x + ball_radius >= bar_x and ball_x - ball_radius <= bar_x + bar_width:
+            ball_speed_y *= -1
+            
+        
+        #rectangle
+        if rect_visible and ball_y - ball_radius <= rect_y + rect_height and ball_y + ball_radius >= rect_y and ball_x - ball_radius <= rect_x + rect_width and ball_x + ball_radius >= rect_x:
+            ball_speed_y *= -1
+            score += 10
+            rect_visible = False
+
+   
+
+        glColor3f(1.0, 1.0, 0.0)
+        draw_bar(bar_x, bar_y)
+        draw_ball(ball_x, ball_y, ball_radius)
+
+
+        if rect_visible:
+            glColor3f(1.0, 0.0, 0.0)
+            glRectf(rect_x, rect_y, rect_x + rect_width, rect_y + rect_height)
+        else:
+            
+            rect_x = random.randint(200, display_width - rect_width)
+            rect_y = random.randint(50,200)
+            rect_visible = True
+
+
+        pygame.display.flip()
+
+        
+        clock.tick(60)
+
+
+        glLoadIdentity()
+
+
+    pygame.quit()
+
+print(score)
+main()
